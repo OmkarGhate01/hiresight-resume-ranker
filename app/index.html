@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HireSight · Resume Parser &amp; Candidate Ranker</title>
+  <meta name="description" content="Parse PDF/DOCX resumes and rank candidates against a job description with an explainable fit score.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f766e'/%3E%3Ccircle cx='14' cy='14' r='6' fill='none' stroke='white' stroke-width='3'/%3E%3Cpath d='M19 19l6 6' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../index.html">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32"><rect width="32" height="32" rx="8"/><circle cx="14" cy="14" r="6"/><path d="M19 19l6 6"/></svg>
+      </span>
+      HireSight
+    </a>
+    <nav class="topnav">
+      <a href="../index.html">Project</a>
+      <a href="#" data-open="api-dialog">API</a>
+      <a href="#" data-open="how-dialog">How scoring works</a>
+    </nav>
+  </header>
+
+  <main class="layout">
+    <aside class="panel setup">
+      <section class="step">
+        <div class="step-head">
+          <span class="step-no">1</span>
+          <h2>Job description</h2>
+          <button class="link-btn" id="load-sample" type="button">Load sample data</button>
+        </div>
+        <textarea id="jd" rows="9" placeholder="Paste the job description here…"></textarea>
+        <div id="jd-summary" class="jd-summary" hidden></div>
+      </section>
+
+      <section class="step">
+        <div class="step-head">
+          <span class="step-no">2</span>
+          <h2>Resumes</h2>
+          <button class="link-btn" id="clear-files" type="button" hidden>Clear</button>
+        </div>
+        <label class="dropzone" id="dropzone">
+          <input type="file" id="file-input" multiple accept=".pdf,.docx,.txt">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>
+          <strong>Drop PDF / DOCX / TXT files</strong>
+          <span>or click to browse · processed in your browser, nothing is uploaded</span>
+        </label>
+        <ul id="file-list" class="file-list"></ul>
+      </section>
+
+      <section class="step">
+        <div class="step-head">
+          <span class="step-no">3</span>
+          <h2>Scoring</h2>
+          <button class="link-btn" id="reset-weights" type="button">Reset</button>
+        </div>
+        <div class="weights">
+          <label>Semantic match <output id="w-semantic-out">50%</output>
+            <input type="range" id="w-semantic" min="0" max="100" value="50">
+          </label>
+          <label>Experience <output id="w-experience-out">30%</output>
+            <input type="range" id="w-experience" min="0" max="100" value="30">
+          </label>
+          <label>Skill overlap <output id="w-skills-out">20%</output>
+            <input type="range" id="w-skills" min="0" max="100" value="20">
+          </label>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="blind" checked>
+          <span class="toggle-ui" aria-hidden="true"></span>
+          <span>
+            <strong>Blind mode</strong>
+            <small>Hide names, contact info, graduation years and identity-linked groups</small>
+          </span>
+        </label>
+      </section>
+
+      <button class="primary" id="rank-btn" type="button" disabled>Rank candidates</button>
+      <p class="hint" id="rank-hint">Add a job description and at least one resume.</p>
+    </aside>
+
+    <section class="results">
+      <div id="empty" class="empty">
+        <div class="empty-art" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <h1>Rank resumes against a job in seconds</h1>
+        <p>Paste a JD, drop in a batch of resumes and get a ranked shortlist with a 0–100 fit score and a plain-English reason for every rank.</p>
+        <button class="secondary" id="empty-sample" type="button">Try it with sample data</button>
+      </div>
+
+      <div id="results-wrap" hidden>
+        <div class="stats" id="stats"></div>
+        <div class="toolbar">
+          <div class="filters">
+            <button class="chip-btn active" data-filter="all" type="button">All</button>
+            <button class="chip-btn" data-filter="shortlisted" type="button">Shortlisted</button>
+            <button class="chip-btn" data-filter="rejected" type="button">Rejected</button>
+          </div>
+          <div class="exports">
+            <button class="ghost" id="export-csv" type="button">Export CSV</button>
+            <button class="ghost" id="export-json" type="button">Export JSON</button>
+          </div>
+        </div>
+        <ol id="results" class="cards"></ol>
+        <section class="feedback" id="feedback"></section>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="modal" class="modal">
+    <form method="dialog" class="modal-head">
+      <h3 id="modal-title"></h3>
+      <button class="icon-btn" aria-label="Close">✕</button>
+    </form>
+    <div id="modal-body" class="modal-body"></div>
+  </dialog>
+
+  <dialog id="api-dialog" class="modal">
+    <form method="dialog" class="modal-head">
+      <h3>REST API</h3>
+      <button class="icon-btn" aria-label="Close">✕</button>
+    </form>
+    <div class="modal-body prose">
+      <p>The same engine runs as serverless functions on Vercel.</p>
+      <table class="api-table">
+        <tr><td><code>GET</code></td><td><code>/api/health</code></td><td>Service status</td></tr>
+        <tr><td><code>POST</code></td><td><code>/api/parse</code></td><td>Resume text → structured JSON (or <code>{"job": "..."}</code> to parse a JD)</td></tr>
+        <tr><td><code>POST</code></td><td><code>/api/rank</code></td><td>JD + list of resumes → ranked results with explanations</td></tr>
+      </table>
+      <pre><code>curl -X POST https://&lt;your-app&gt;.vercel.app/api/rank \
+  -H "Content-Type: application/json" \
+  -d '{"job": "Senior Data Scientist, 5+ years Python, NLP, AWS",
+       "resumes": [{"name": "a.txt", "text": "..."}]}'</code></pre>
+    </div>
+  </dialog>
+
+  <dialog id="how-dialog" class="modal">
+    <form method="dialog" class="modal-head">
+      <h3>How the fit score works</h3>
+      <button class="icon-btn" aria-label="Close">✕</button>
+    </form>
+    <div class="modal-body prose">
+      <ol>
+        <li><strong>Parse.</strong> Text is pulled out of the file (two-column PDFs are read column by column), split into sections, and turned into JSON: jobs with durations, education, skills, and quantified achievements.</li>
+        <li><strong>Normalise skills.</strong> "K8s", "EKS" and "Kubernetes" all become one canonical skill. Implied skills are added (PyTorch ⇒ Python, Deep Learning).</li>
+        <li><strong>Blind.</strong> Names, contact details, graduation years, personal-details blocks and identity-linked groups are redacted before scoring.</li>
+        <li><strong>Stage 1 – retrieval.</strong> TF-IDF vectors with canonical skill tokens, cosine similarity against the JD.</li>
+        <li><strong>Stage 2 – rerank.</strong> The JD is compared with each job block separately; recent roles weigh more.</li>
+        <li><strong>Stage 3 – fit score.</strong> <code>50% semantic + 30% experience + 20% skills</code>. Experience below the requirement decays exponentially. Skills get partial credit for close alternatives (Azure for AWS ≈ 70%).</li>
+      </ol>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>

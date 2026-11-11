@@ -1,0 +1,17 @@
+{
+  "name": "hiresight",
+  "version": "1.0.0",
+  "description": "Resume parsing and candidate ranking for recruiters (Persevex internship project)",
+  "type": "module",
+  "private": true,
+  "author": "Omkar Vijay Ghate",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "dev": "npx vercel dev",
+    "samples": "python3 tools/make_samples.py"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
